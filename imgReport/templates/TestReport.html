@@ -1,0 +1,510 @@
+{% extends "./AdminLTE-master/index.html" %}
+<!DOCTYPE html>
+<html>
+<head>
+    {% block headBlock %}
+    <meta charset="utf-8">
+    <!-- 引入 ECharts 文件 -->
+    <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdn.bootcss.com/echarts/4.1.0.rc2/echarts-en.common.js"></script>
+{#    <link href="https://cdn.bootcss.com/bootstrap/4.1.1/css/bootstrap-grid.css" rel="stylesheet">#}
+{#    <link href="https://cdn.bootcss.com/bootstrap/4.1.1/css/bootstrap-grid.min.css" rel="stylesheet">#}
+{#    <link href="https://cdn.bootcss.com/bootstrap/4.1.1/css/bootstrap-reboot.css" rel="stylesheet">#}
+{#    <link href="https://cdn.bootcss.com/bootstrap/4.1.1/css/bootstrap-reboot.min.css" rel="stylesheet">#}
+{#    <link href="https://cdn.bootcss.com/bootstrap/4.1.1/css/bootstrap.css" rel="stylesheet">#}
+{#    <link href="https://cdn.bootcss.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet">#}
+{#    <script src="https://cdn.bootcss.com/bootstrap/4.1.1/js/bootstrap.bundle.js"></script>#}
+{#    <script src="https://cdn.bootcss.com/bootstrap/4.1.1/js/bootstrap.bundle.min.js"></script>#}
+{#    <script src="https://cdn.bootcss.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>#}
+    <script src="../static/csrftoken.js"></script>
+    <style>
+        li{list-style-type:none;cursor:pointer;}
+        li:hover{background-color:rgb(51,133,255)}
+        .centerBtnbox{
+            width:100%;height:50%;
+            position: relative;
+        }
+        .centerBtnbox .btn{
+            position: absolute;
+            width: 80px;
+            height: 38px;
+            top: 50%;
+            margin-top: -19px;
+            left: 50%;
+            margin-left: -40px;
+        }
+        #choiceVer{padding: 9px 6px 6px 10px;}
+        #afterCho{padding: 9px 6px 6px 10px;}
+        #vernumLeft{padding: 0px;} #vernumRight{padding: 0px;}
+        {% endblock %}
+    </style>
+</head>
+<body>
+    <!-- 为 ECharts 准备一个具备大小（宽高）的 DOM -->
+    {% block titleblock %}测试报告{% endblock %}
+    {% block contentblock %}
+    <div style="width: 250px;height: 80px;float:left;position: relative;z-index: 100;padding-top: 25px;">
+        <div class="dropdown show">
+          <a  class="btn btn-secondary dropdown-toggle" href="#" role="button" id="D1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            选择项目
+          </a>
+
+          <div id='project' class="dropdown-menu" aria-labelledby="D1">
+	    {%for key,value in context.items%}
+            	    <a class="dropdown-item dropdown-item1" data-value='{{key}}' href="#">{{value}}</a>
+	    {%endfor%}
+          </div>
+        </div>
+    </div>
+    <div id='version' style="width: 80px;height: 80px;float: left;position: relative;z-index: 100;padding-top: 25px;">
+        <div class="dropdown show">
+          <a class="btn btn-secondary dropdown-toggle" href="#" role="button" id="D2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            选择版本
+          </a>
+
+          <div class="dropdown-menu" aria-labelledby="dropdownMenuLink" id='Version'>
+          </div>
+        </div>
+    </div>
+    <div id="main" style="width: 1000px;height:600px;margin-top:80px;"></div>
+    <form class="formZw" method="post">
+    {%csrf_token%}
+    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" >
+        <div class="modal-content" style="width:800px; height:500px;position:relative;">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 style='position: absolute;' class="modal-title" id="myModalLabel">请选择子版本</h4>
+            </div>
+            <div class="modal-body">
+                <div id="selectTree" class="">
+                    <div style="width:710px;height: 350px;">
+                        <div id="choiceVer" style="width:300px;height: 350px;float: left;border: gray 1px solid;border-radius: 15px;">
+                            <ul id="vernumLeft" style="width:285px;height: 350px;">
+
+                            </ul>
+                        </div>
+                        <div id="edit" style="width:100px;height: 350px;float: left;">
+                            <div class="centerBtnbox" >
+                                <button type="button" id='leftMove' class="btn btn-info"><<左移</button>
+                            </div>
+                            <div class="centerBtnbox" >
+                                <button type="button" id='rightMove' class="btn btn-info">>>右移</button>
+                            </div>
+                        </div>
+                        <div id="afterCho" style="width:300px;height: 350px;float: left;border: gray 1px solid;border-radius: 15px;">
+                            <ul id="vernumRight" style="width:285px;height: 350px;">
+
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+                <button type="button" id='submit' type="submit" class="btn btn-primary">提交更改</button>
+            </div>
+        </div><!-- /.modal-content -->
+    </div><!-- /.modal -->
+</div>
+</body>
+
+<script>
+
+    function drawSheet(data){
+        var myChart = echarts.init(document.getElementById('main'));
+        myChart.clear()
+    option = {
+        title : {
+            text: '阶段性测试报告图表',
+            subtext: '测试环境'
+        },
+        tooltip : {
+            trigger: 'axis'
+        },
+        legend: {
+            data:['新建BUG','解决的BUG']
+        },
+        toolbox: {
+            show : true,
+            feature : {
+                dataView : {show: true, readOnly: false},
+                magicType : {show: true, type: ['line', 'bar']},
+                restore : {show: true},
+                saveAsImage : {show: true}
+            }
+        },
+        calculable : true,
+        xAxis : [
+            {
+//                '4月','5月','6月','7月','8月','9月','10月','11月','12月'
+                type : 'category',
+                data : data['verName']
+//                data:[1,2,3,4,5,6]
+            }
+        ],
+        yAxis : [
+            {
+                type : 'value'
+            }
+        ],
+        series : [
+            {
+                name:'新建BUG',
+                type:'bar',
+//                , 23.2, 25.6, 76.7, 135.6, 162.2, 32.6, 20.0, 6.4, 3.3
+                data:data['newBug'],
+//                data:[1,2,3,4,5,6],
+                markPoint : {
+                    data : [
+                        {type : 'max', name: '最大值'},
+                        {type : 'min', name: '最小值'}
+                    ]
+                },
+                markLine : {
+                    data : [
+                        {type : 'average', name: '平均值'}
+                    ]
+                }
+            },
+            {
+                name:'解决的BUG',
+                type:'bar',
+                data:data['fixBug'],
+//                data:[1,2,3,4,5,6],
+                markPoint : {
+                    data : [
+                        {type : 'max', name: '最大值'},
+                        {type : 'min', name: '最小值'}
+//                        {name : '最高值', value : 182.2, xAxis: 7, yAxis: 183},
+//                        {name : '最低值', value : 2.3, xAxis: 11, yAxis: 3}
+                    ]
+                },
+                markLine : {
+                    data : [
+                        {type : 'average', name : '平均值'}
+                    ]
+                }
+            }
+        ]
+    };
+     myChart.setOption(option);
+    }
+    function drawChildVerSheet(data){
+        var myChart = echarts.init(document.getElementById('main'));
+        myChart.clear()
+    option = {
+        title : {
+            text: '阶段性测试报告图表',
+            subtext: '测试环境'
+        },
+        tooltip : {
+            trigger: 'axis'
+        },
+        legend: {
+            data:['总bug数','每版新增bug数','每版关闭bug数','总未关闭bug数']
+        },
+        toolbox: {
+            show : true,
+            feature : {
+                dataView : {show: true, readOnly: false},
+                magicType : {show: true, type: ['line', 'bar']},
+                restore : {show: true},
+                saveAsImage : {show: true}
+            }
+        },
+        calculable : true,
+        xAxis : [
+            {
+//                '4月','5月','6月','7月','8月','9月','10月','11月','12月'
+                type : 'category',
+                data : data['verName']
+//                data:[1,2,3,4,5,6]
+            }
+        ],
+        yAxis : [
+            {
+                type : 'value'
+            }
+        ],
+        series : [
+            {
+                name:'总bug数',
+                type:'bar',
+//                , 23.2, 25.6, 76.7, 135.6, 162.2, 32.6, 20.0, 6.4, 3.3
+                data:data['allBugNum'],
+//                data:[1,2,3,4,5,6],
+{#                markPoint : {#}
+{#                    data : [#}
+{#                        {type : 'max', name: '最大值'},#}
+{#                        {type : 'min', name: '最小值'}#}
+{#                    ]#}
+{#                },#}
+{#                markLine : {#}
+{#                    data : [#}
+{#                        {type : 'average', name: '平均值'}#}
+{#                    ]#}
+{#                }#}
+            },
+
+            {
+                name:'每版新增bug数',
+                type:'bar',
+                data:data['everyCreateNum'],
+//                data:[1,2,3,4,5,6],
+{#                markPoint : {#}
+{#                    data : [#}
+{#                        {type : 'max', name: '最大值'},#}
+{#                        {type : 'min', name: '最小值'}#}
+{#//                        {name : '最高值', value : 182.2, xAxis: 7, yAxis: 183},#}
+{#//                        {name : '最低值', value : 2.3, xAxis: 11, yAxis: 3}#}
+{#                    ]#}
+{#                },#}
+{#                markLine : {#}
+{#                    data : [#}
+{#                        {type : 'average', name : '平均值'}#}
+{#                    ]#}
+{#                }#}
+            },
+            {
+                name:'每版关闭bug数',
+                type:'bar',
+                data:data['everyCloseNum'],
+//                data:[1,2,3,4,5,6],
+{#                markPoint : {#}
+{#                    data : [#}
+{#                        {type : 'max', name: '最大值'},#}
+{#                        {type : 'min', name: '最小值'}#}
+{#//                        {name : '最高值', value : 182.2, xAxis: 7, yAxis: 183},#}
+{#//                        {name : '最低值', value : 2.3, xAxis: 11, yAxis: 3}#}
+{#                    ]#}
+{#                },#}
+{#                markLine : {#}
+{#                    data : [#}
+{#                        {type : 'average', name : '平均值'}#}
+{#                    ]#}
+{#                }#}
+            },
+            {
+                name:'总未关闭bug数',
+                type:'bar',
+                data:data['allUnCloseNum'],
+
+{#                markPoint : {#}
+{#                    data : [#}
+{#                        {type : 'max', name: '最大值'},#}
+{#                        {type : 'min', name: '最小值'}#}
+{#//                        {name : '最高值', value : 182.2, xAxis: 7, yAxis: 183},#}
+{#//                        {name : '最低值', value : 2.3, xAxis: 11, yAxis: 3}#}
+{#                    ]#}
+{#                },#}
+{#                markLine : {#}
+{#                    data : [#}
+{#                        {type : 'average', name : '平均值'}#}
+{#                    ]#}
+{#                }#}
+
+            },
+
+        ],
+        label: {
+                  show: true,
+                  position: 'top',
+                  color: 'black',
+                  shadowColor:'transparent',
+                  borderWidth :20,
+                  fontWeight:'bold',
+                  borderRadius :100,
+                  width :'100',
+                  height:'100',
+
+
+              }
+
+
+
+    };
+     myChart.setOption(option);
+    }
+    $(function () {
+	    var BigId;
+	    drawSheet({
+	        'newBug':[0],
+            'fixBug':[0],
+            'verName':['暂无'],
+        });
+
+        $('.dropdown-item1').click(function (e) {
+            var text = $(e.currentTarget).text();
+            var id =$(this).data('value');
+	        BigId = id;
+            $('#D1').text(text);
+            $('#D2').text('选择版本');
+            ssajax.ajax({
+                url: '/getPro/' + id,
+                type: 'get',
+                datatype: 'json',
+                success: function (data) {
+                    var html = '';
+                    $('.dropdown-item2').remove();
+                    jsonData = data['version']
+                    for (jindex in jsonData) {
+                        console.log(jindex, jsonData[jindex]);
+                        html = '<a  class="dropdown-item dropdown-item2" data-value=' + jindex + ' href="#">' + jsonData[jindex] + '</a>';
+                        $('#Version').append(html);
+                    }
+
+                }
+            });
+
+        });
+        function registClick(element) {
+            for(var i=0;i<element.length;i++){
+                var ulO = $(element[i]).children();
+                    for (var i = 0; i < ulO.length; i++) {
+                        ulO[i].onclick=function(){
+                            color = this.style.backgroundColor;
+                            if (color == ''){
+                                this.style.backgroundColor='red';
+                                this.setAttribute('data-value','check')
+                            }
+                            else{
+                                this.style.backgroundColor='';
+                                this.setAttribute('data-value','uncheck')
+                            }
+                        }
+
+                    }
+            }
+
+        }
+        function getAllVerId() {
+            var allListId = {};
+            searchVer1 = $('#vernumLeft').children();
+            searchVer2 = $('#vernumRight').children();
+            for(var i=0;i<searchVer1.length;i++){
+                allListId[$(searchVer1[i]).text()] = $(searchVer1[i]).attr('id');
+            }
+            for(var i=0;i<searchVer2.length;i++){
+                allListId[$(searchVer2[i]).text()] = $(searchVer2[i]).attr('id')
+            }
+            return allListId
+        }
+        function move(actions){
+            element = ['#vernumLeft','#vernumRight']
+            if(actions=='left'){
+                elementAll = $(element[0]).children();
+            }else{
+                elementAll = $(element[1]).children();
+            }
+            var rawHtml = [];
+            var needHtml = [];
+            var flag = true;
+            for(var i=0;i<elementAll.length;i++){
+                if($(elementAll[i]).attr('data-value') == 'check'){
+                    rawHtml.push(elementAll[i]);
+                    elementAll[i].remove();
+                    flag = false;
+                }
+            }
+            if (flag==true){
+                alert('请选择需要查询的版本')
+            }
+            for (var i=0;i<rawHtml.length;i++){
+                $(rawHtml[i]).attr('data-value','uncheck');
+                $(rawHtml[i]).css('background-color','');
+                needHtml.push(rawHtml[i]);
+            }
+            if(actions=='left') {
+                $(element[1]).append(needHtml)
+            }else{
+                $(element[0]).append(needHtml)
+            }
+        }
+        $('#leftMove').click(function (e) {
+            move('right')
+        });
+
+        $('#rightMove').click(function (e) {
+            move('left')
+        });
+        $('#submit').click(function (e) {
+            searchVer = $('#vernumRight').children();
+            idAllList = getAllVerId();
+            console.log(idAllList)
+            if (searchVer.length < 1){
+                alert('请选则要查询的版本')
+            }else{
+                var idlist =[];
+                var verName = [];
+
+                $("#myModal").modal("hide");
+                for (var i=0;i<searchVer.length;i++){
+                    idlist.push($(searchVer[i]).attr('id'))
+                    verName.push($(searchVer[i]).text())
+                }
+
+                $.ajax({
+                    url:'/getChildVerBug/',
+                    type:'post',
+                    headers:{'content-type':'application/x-www-form-urlencoded'},
+                    data:{'data':JSON.stringify({'ids':idlist,'verName':verName,'idAllList':idAllList})},
+                    success:function (data) {
+                        drawChildVerSheet(data);
+                    }
+                })
+            }
+        })
+        $(document).on('click','.dropdown-item2',function(e){
+        var text = $(this).text();
+        var id = $(this).data('value')
+        $('#D2').text(text);
+        $.ajax({
+            url:'/isSonVerOrParVer/'+BigId+'/'+text,
+            type:'get',
+            datatype:'json',
+            success:function (data) {
+                $('#vernumLeft').children().remove()
+                $('#vernumRight').children().remove()
+                console.log(data);
+{#                data['flag'] = true#}
+
+                if (data['flag']==true){
+                    var dataV = data;
+{#                    var dataV = {'childVer':{'10122':'测试1.1.1.1','10220':'测试1.1.1.2','10333':'测试1.1.1.3'}};#}
+                    $("#myModal").modal("show");
+                    var html1 = '';
+                    for (dIndex in dataV['childVer']){
+                        html1 = '<li id='+dIndex+' data-value="uncheck">'+dataV['childVer'][dIndex]+'</li>';
+                        $('#vernumLeft').append(html1)
+                    }
+                    registClick(['#vernumLeft']);
+
+
+                }
+                else{
+                    $.ajax({
+                        url:'/getAllBug/'+id,
+                        type:'get',
+                        datatype:"json",
+                        success:function (data) {
+                            data['verName'] = [text];
+                            drawSheet(data);
+                        }
+                    })
+
+                }
+            }
+        });
+    });
+});
+
+
+
+
+
+    </script>
+{% endblock %}
+</html>
+
